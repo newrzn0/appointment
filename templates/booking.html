@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Book Appointment - {{ shop.name }}{% endblock %}
+
+{% block content %}
+<div class="booking-container">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">{{ shop.name }}</h2>
+            <small>{{ shop.address }}</small>
+        </div>
+        <div class="card-body">
+            <h4 class="mb-4">Book Your Appointment</h4>
+            
+            <form method="POST" action="{{ url_for('book_appointment', shop_id=shop.id) }}">
+                <div class="mb-3">
+                    <label for="date" class="form-label">Select Date</label>
+                    <input type="date" class="form-control" id="date" name="date" required 
+                           min="{{ today }}" max="{{ max_date }}">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Available Time Slots</label>
+                    <div class="row" id="time-slots">
+                        {% for slot in time_slots %}
+                        <div class="col-md-3 mb-2">
+                            <div class="time-slot p-2 text-center border rounded {% if slot.is_booked %}booked{% endif %}"
+                                 data-time="{{ slot.time }}">
+                                {{ slot.time }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <input type="hidden" name="time_slot" id="selected-time" required>
+                
+                <div class="mb-3">
+                    <label for="name" class="form-label">Your Name</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="phone" class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="phone" name="phone" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Book Appointment</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const timeSlots = document.querySelectorAll('.time-slot:not(.booked)');
+    const selectedTimeInput = document.getElementById('selected-time');
+    
+    timeSlots.forEach(slot => {
+        slot.addEventListener('click', function() {
+            // Remove selected class from all slots
+            timeSlots.forEach(s => s.classList.remove('bg-primary', 'text-white'));
+            
+            // Add selected class to clicked slot
+            this.classList.add('bg-primary', 'text-white');
+            
+            // Update hidden input
+            selectedTimeInput.value = this.dataset.time;
+        });
+    });
+
+    // Handle date change
+    document.getElementById('date').addEventListener('change', function() {
+        // In a real application, this would fetch new time slots for the selected date
+        // For now, we'll just reload the page with the new date
+        window.location.href = `{{ url_for('book_appointment', shop_id=shop.id) }}?date=${this.value}`;
+    });
+});
+</script>
+{% endblock %} 

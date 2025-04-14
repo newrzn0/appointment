@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Salon Booking System{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h1 class="display-4 mb-4">Welcome to Salon Booking System</h1>
+    <p class="lead mb-5">Book your appointments easily with our QR code system</p>
+
+    <div class="row justify-content-center">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="bi bi-qr-code-scan display-1 text-primary mb-3"></i>
+                    <h3 class="card-title">For Customers</h3>
+                    <p class="card-text">Scan the QR code at your preferred salon to book an appointment instantly.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="bi bi-shop display-1 text-primary mb-3"></i>
+                    <h3 class="card-title">For Shop Owners</h3>
+                    <p class="card-text">Manage your appointments and track bookings through our easy-to-use dashboard.</p>
+                    <a href="{{ url_for('owner_login') }}" class="btn btn-primary">Login as Owner</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="bi bi-person-gear display-1 text-primary mb-3"></i>
+                    <h3 class="card-title">For Administrators</h3>
+                    <p class="card-text">Manage all shops, generate QR codes, and monitor the system.</p>
+                    <a href="{{ url_for('admin_login') }}" class="btn btn-primary">Login as Admin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <h2>How It Works</h2>
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="display-4 text-primary mb-3">1</div>
+                        <h5>Scan QR Code</h5>
+                        <p>Find the QR code at your preferred salon</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="display-4 text-primary mb-3">2</div>
+                        <h5>Choose Time</h5>
+                        <p>Select your preferred time slot</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="display-4 text-primary mb-3">3</div>
+                        <h5>Enter Details</h5>
+                        <p>Provide your name and contact information</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="display-4 text-primary mb-3">4</div>
+                        <h5>Confirm Booking</h5>
+                        <p>Get instant confirmation of your appointment</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

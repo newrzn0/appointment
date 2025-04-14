@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Admin Dashboard</h2>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addShopModal">
+            Add New Shop
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Shops</h5>
+                    <h2 class="card-text">{{ total_shops }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Appointments</h5>
+                    <h2 class="card-text">{{ total_appointments }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Active Bookings</h5>
+                    <h2 class="card-text">{{ active_bookings }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h4>Manage Shops</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Shop Name</th>
+                            <th>Address</th>
+                            <th>Owner Username</th>
+                            <th>Total Bookings</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for shop in shops %}
+                        <tr>
+                            <td>{{ shop.name }}</td>
+                            <td>{{ shop.address }}</td>
+                            <td>{{ shop.owner_username }}</td>
+                            <td>{{ shop.appointments|length }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="editShop({{ shop.id }})">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        onclick="deleteShop({{ shop.id }})">
+                                    Delete
+                                </button>
+                                <a href="{{ url_for('get_shop_qr', shop_id=shop.id) }}" 
+                                   class="btn btn-sm btn-outline-info">
+                                    View QR
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Shop Modal -->
+<div class="modal fade" id="addShopModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Shop</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addShopForm">
+                    <div class="mb-3">
+                        <label for="shopName" class="form-label">Shop Name</label>
+                        <input type="text" class="form-control" id="shopName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="shopAddress" class="form-label">Address</label>
+                        <textarea class="form-control" id="shopAddress" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ownerUsername" class="form-label">Owner Username</label>
+                        <input type="text" class="form-control" id="ownerUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ownerPassword" class="form-label">Owner Password</label>
+                        <input type="password" class="form-control" id="ownerPassword" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitNewShop()">Add Shop</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editShop(shopId) {
+    // Implementation for editing shop details
+    // This would open another modal or redirect to an edit page
+}
+
+function deleteShop(shopId) {
+    if (confirm('Are you sure you want to delete this shop? This will also delete all associated appointments.')) {
+        fetch(`/admin/shop/${shopId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to delete shop');
+            }
+        });
+    }
+}
+
+function submitNewShop() {
+    const formData = {
+        name: document.getElementById('shopName').value,
+        address: document.getElementById('shopAddress').value,
+        owner_username: document.getElementById('ownerUsername').value,
+        owner_password: document.getElementById('ownerPassword').value
+    };
+
+    fetch('/admin/shop', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Failed to add shop');
+        }
+    });
+}
+</script>
+{% endblock %} 
