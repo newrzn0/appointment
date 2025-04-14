@@ -10,7 +10,7 @@ from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///salon.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///appointment.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -19,13 +19,15 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Database Models
-class Shop(db.Model):
+class Business(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(200), nullable=False)
     owner_username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    appointments = db.relationship('Appointment', backref='shop', lazy=True)
+    appointments = db.relationship('Appointment', backref='business', lazy=True)
+    working_hours = db.Column(db.String(200), default='09:00-17:00')
+    slot_duration = db.Column(db.Integer, default=30)  # in minutes
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -35,7 +37,7 @@ class Shop(db.Model):
 
 class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    shop_id = db.Column(db.Integer, db.ForeignKey('shop.id'), nullable=False)
+    business_id = db.Column(db.Integer, db.ForeignKey('business.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
     time_slot = db.Column(db.String(50), nullable=False)
     customer_name = db.Column(db.String(100), nullable=False)
@@ -58,9 +60,9 @@ def load_user(user_id):
     return Admin.query.get(int(user_id))
 
 # Helper Functions
-def generate_qr_code(shop_id):
+def generate_qr_code(business_id):
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    booking_url = f"{request.host_url}book/{shop_id}"
+    booking_url = f"{request.host_url}book/{business_id}"
     qr.add_data(booking_url)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
@@ -70,21 +72,23 @@ def generate_qr_code(shop_id):
     img_io.seek(0)
     return img_io
 
-def get_available_time_slots(shop_id, date):
-    # This is a simplified version. In a real application, you'd want to:
-    # 1. Get shop's working hours
-    # 2. Check existing appointments
-    # 3. Return available slots
-    slots = []
-    start_time = datetime.strptime('09:00', '%H:%M')
-    end_time = datetime.strptime('17:00', '%H:%M')
-    interval = timedelta(minutes=30)
+def get_available_time_slots(business_id, date):
+    business = Business.query.get(business_id)
+    if not business:
+        return []
+    
+    # Parse working hours
+    start_time_str, end_time_str = business.working_hours.split('-')
+    start_time = datetime.strptime(start_time_str, '%H:%M')
+    end_time = datetime.strptime(end_time_str, '%H:%M')
+    interval = timedelta(minutes=business.slot_duration)
 
+    slots = []
     current_time = start_time
     while current_time < end_time:
         time_str = current_time.strftime('%H:%M')
         is_booked = Appointment.query.filter_by(
-            shop_id=shop_id,
+            business_id=business_id,
             date=date,
             time_slot=time_str
         ).first() is not None
@@ -102,10 +106,14 @@ def get_available_time_slots(shop_id, date):
 def index():
     return render_template('index.html')
 
-@app.route('/book/<int:shop_id>', methods=['GET', 'POST'])
-def book_appointment(shop_id):
-    shop = Shop.query.get_or_404(shop_id)
-    date = request.args.get('date', datetime.now().date())
+@app.route('/book/<int:business_id>', methods=['GET', 'POST'])
+def book_appointment(business_id):
+    business = Business.query.get_or_404(business_id)
+    date = request.args.get('date')
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    else:
+        date = datetime.now().date()
     
     if request.method == 'POST':
         time_slot = request.form.get('time_slot')
@@ -114,17 +122,17 @@ def book_appointment(shop_id):
         
         # Check if slot is still available
         existing_appointment = Appointment.query.filter_by(
-            shop_id=shop_id,
+            business_id=business_id,
             date=date,
             time_slot=time_slot
         ).first()
         
         if existing_appointment:
             flash('This time slot has already been booked. Please choose another.', 'danger')
-            return redirect(url_for('book_appointment', shop_id=shop_id))
+            return redirect(url_for('book_appointment', business_id=business_id))
         
         appointment = Appointment(
-            shop_id=shop_id,
+            business_id=business_id,
             date=date,
             time_slot=time_slot,
             customer_name=customer_name,
@@ -135,14 +143,25 @@ def book_appointment(shop_id):
         db.session.commit()
         
         flash('Appointment booked successfully!', 'success')
-        return redirect(url_for('book_appointment', shop_id=shop_id))
+        return redirect(url_for('book_appointment', business_id=business_id))
     
-    time_slots = get_available_time_slots(shop_id, date)
+    time_slots = get_available_time_slots(business_id, date)
     return render_template('booking.html', 
-                         shop=shop,
+                         business=business,
                          time_slots=time_slots,
+                         selected_date=date,
                          today=datetime.now().date(),
                          max_date=datetime.now().date() + timedelta(days=30))
+
+@app.route('/api/time-slots/<int:business_id>')
+def get_time_slots(business_id):
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'error': 'Date parameter is required'}), 400
+    
+    date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    time_slots = get_available_time_slots(business_id, date)
+    return jsonify(time_slots)
 
 @app.route('/owner/login', methods=['GET', 'POST'])
 def owner_login():
@@ -150,9 +169,9 @@ def owner_login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        shop = Shop.query.filter_by(owner_username=username).first()
-        if shop and shop.check_password(password):
-            login_user(shop)
+        business = Business.query.filter_by(owner_username=username).first()
+        if business and business.check_password(password):
+            login_user(business)
             return redirect(url_for('owner_dashboard'))
         
         flash('Invalid username or password', 'danger')
@@ -166,20 +185,20 @@ def owner_dashboard():
     
     if filter_type == 'today':
         appointments = Appointment.query.filter_by(
-            shop_id=current_user.id,
+            business_id=current_user.id,
             date=today
         ).order_by(Appointment.time_slot).all()
     elif filter_type == 'week':
         week_end = today + timedelta(days=7)
         appointments = Appointment.query.filter(
-            Appointment.shop_id == current_user.id,
+            Appointment.business_id == current_user.id,
             Appointment.date >= today,
             Appointment.date <= week_end
         ).order_by(Appointment.date, Appointment.time_slot).all()
     else:  # month
         month_end = today + timedelta(days=30)
         appointments = Appointment.query.filter(
-            Appointment.shop_id == current_user.id,
+            Appointment.business_id == current_user.id,
             Appointment.date >= today,
             Appointment.date <= month_end
         ).order_by(Appointment.date, Appointment.time_slot).all()
@@ -203,50 +222,52 @@ def admin_login():
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
-    shops = Shop.query.all()
+    businesses = Business.query.all()
     total_appointments = Appointment.query.count()
     active_bookings = Appointment.query.filter_by(status='pending').count()
     
     return render_template('admin/dashboard.html',
-                         shops=shops,
-                         total_shops=len(shops),
+                         businesses=businesses,
+                         total_businesses=len(businesses),
                          total_appointments=total_appointments,
                          active_bookings=active_bookings)
 
-@app.route('/admin/shop', methods=['POST'])
+@app.route('/admin/business', methods=['POST'])
 @login_required
-def create_shop():
+def create_business():
     data = request.get_json()
     
-    shop = Shop(
+    business = Business(
         name=data['name'],
         address=data['address'],
-        owner_username=data['owner_username']
+        owner_username=data['owner_username'],
+        working_hours=data.get('working_hours', '09:00-17:00'),
+        slot_duration=data.get('slot_duration', 30)
     )
-    shop.set_password(data['owner_password'])
+    business.set_password(data['owner_password'])
     
-    db.session.add(shop)
+    db.session.add(business)
     db.session.commit()
     
-    return jsonify({'success': True, 'shop_id': shop.id})
+    return jsonify({'success': True, 'business_id': business.id})
 
-@app.route('/admin/shop/<int:shop_id>', methods=['DELETE'])
+@app.route('/admin/business/<int:business_id>', methods=['DELETE'])
 @login_required
-def delete_shop(shop_id):
-    shop = Shop.query.get_or_404(shop_id)
+def delete_business(business_id):
+    business = Business.query.get_or_404(business_id)
     
-    # Delete all appointments for this shop
-    Appointment.query.filter_by(shop_id=shop_id).delete()
+    # Delete all appointments for this business
+    Appointment.query.filter_by(business_id=business_id).delete()
     
-    db.session.delete(shop)
+    db.session.delete(business)
     db.session.commit()
     
     return jsonify({'success': True})
 
-@app.route('/shop/<int:shop_id>/qr')
+@app.route('/business/<int:business_id>/qr')
 @login_required
-def get_shop_qr(shop_id):
-    img_io = generate_qr_code(shop_id)
+def get_business_qr(business_id):
+    img_io = generate_qr_code(business_id)
     return send_file(img_io, mimetype='image/png')
 
 @app.route('/appointment/<int:appointment_id>/confirm', methods=['POST'])

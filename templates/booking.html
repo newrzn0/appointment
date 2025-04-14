@@ -1,22 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Book Appointment - {{ shop.name }}{% endblock %}
+{% block title %}Book Appointment - {{ business.name }}{% endblock %}
 
 {% block content %}
 <div class="booking-container">
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h2 class="mb-0">{{ shop.name }}</h2>
-            <small>{{ shop.address }}</small>
+            <h2 class="mb-0">{{ business.name }}</h2>
+            <small>{{ business.address }}</small>
         </div>
         <div class="card-body">
             <h4 class="mb-4">Book Your Appointment</h4>
             
-            <form method="POST" action="{{ url_for('book_appointment', shop_id=shop.id) }}">
+            <form method="POST" action="{{ url_for('book_appointment', business_id=business.id) }}">
                 <div class="mb-3">
                     <label for="date" class="form-label">Select Date</label>
-                    <input type="date" class="form-control" id="date" name="date" required 
-                           min="{{ today }}" max="{{ max_date }}">
+                    <input type="date" class="form-control" id="date" name="date" 
+                           value="{{ selected_date.strftime('%Y-%m-%d') }}"
+                           min="{{ today.strftime('%Y-%m-%d') }}" 
+                           max="{{ max_date.strftime('%Y-%m-%d') }}">
                 </div>
 
                 <div class="mb-3">
@@ -57,6 +59,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const timeSlots = document.querySelectorAll('.time-slot:not(.booked)');
     const selectedTimeInput = document.getElementById('selected-time');
+    const dateInput = document.getElementById('date');
     
     timeSlots.forEach(slot => {
         slot.addEventListener('click', function() {
@@ -72,10 +75,39 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle date change
-    document.getElementById('date').addEventListener('change', function() {
-        // In a real application, this would fetch new time slots for the selected date
-        // For now, we'll just reload the page with the new date
-        window.location.href = `{{ url_for('book_appointment', shop_id=shop.id) }}?date=${this.value}`;
+    dateInput.addEventListener('change', function() {
+        const selectedDate = this.value;
+        const businessId = {{ business.id }};
+        
+        // Fetch new time slots for the selected date
+        fetch(`/api/time-slots/${businessId}?date=${selectedDate}`)
+            .then(response => response.json())
+            .then(slots => {
+                const timeSlotsContainer = document.getElementById('time-slots');
+                timeSlotsContainer.innerHTML = '';
+                
+                slots.forEach(slot => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-3 mb-2';
+                    
+                    const timeSlot = document.createElement('div');
+                    timeSlot.className = `time-slot p-2 text-center border rounded ${slot.is_booked ? 'booked' : ''}`;
+                    timeSlot.dataset.time = slot.time;
+                    timeSlot.textContent = slot.time;
+                    
+                    if (!slot.is_booked) {
+                        timeSlot.addEventListener('click', function() {
+                            timeSlots.forEach(s => s.classList.remove('bg-primary', 'text-white'));
+                            this.classList.add('bg-primary', 'text-white');
+                            selectedTimeInput.value = this.dataset.time;
+                        });
+                    }
+                    
+                    col.appendChild(timeSlot);
+                    timeSlotsContainer.appendChild(col);
+                });
+            })
+            .catch(error => console.error('Error fetching time slots:', error));
     });
 });
 </script>
