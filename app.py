@@ -297,7 +297,7 @@ if __name__ == '__main__':
         db.create_all()
         
         # Create default admin if not exists
-        if not Admin.query.first():
+        if not Admin.query.filter_by(username='admin').first():
             admin = Admin(username='admin')
             admin.set_password('admin123')
             db.session.add(admin)
